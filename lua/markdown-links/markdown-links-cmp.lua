@@ -214,6 +214,7 @@ function M.setup_cmp()
 	cmp.event:on("confirm_done", function(event)
 		local entry = event.entry
 		local item = entry:get_completion_item()
+		vim.notify(entry.source.name)
 		if entry.source.name == "markdown-links" then
 			local insert_text = item.insertText or item.label
 			local cursor_pos = vim.api.nvim_win_get_cursor(0)
