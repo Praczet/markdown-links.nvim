@@ -122,8 +122,13 @@ function source:complete(_, callback)
 	-- Logic to detect cursor position and suggest items
 	local line = vim.api.nvim_get_current_line()
 	local col = vim.api.nvim_win_get_cursor(0)[2]
-	local in_square_brackets = string.find(line:sub(1, col), "%[.-%]")
-	local in_parentheses = string.find(line:sub(1, col), "%(.-%)")
+	-- local in_square_brackets = string.find(line:sub(1, col), "%[.-%]")
+	-- local in_parentheses = string.find(line:sub(1, col), "%(.-%)")
+	-- Find the positions of the opening and closing square brackets
+	local in_square_brackets = line:sub(1, col):match("()%[[^%[%]]*$")
+
+	-- Find the positions of the opening and closing parentheses
+	local in_parentheses = line:sub(1, col):match("()%([^%(%)]*$")
 
 	if in_square_brackets then
 		-- Fuzzy search H1 headers and YAML titles
