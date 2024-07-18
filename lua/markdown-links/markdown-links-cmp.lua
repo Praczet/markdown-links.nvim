@@ -116,14 +116,55 @@ function M.search_file_names(query)
 	return matches
 end
 
+-- function source:complete(_, callback)
+-- 	local items = {}
+--
+-- 	-- Logic to detect cursor position and suggest items
+-- 	local line = vim.api.nvim_get_current_line()
+-- 	local col = vim.api.nvim_win_get_cursor(0)[2]
+-- 	-- local in_square_brackets = string.find(line:sub(1, col), "%[.-%]")
+-- 	-- local in_parentheses = string.find(line:sub(1, col), "%(.-%)")
+-- 	-- Find the positions of the opening and closing square brackets
+-- 	local in_square_brackets = line:sub(1, col):match("()%[[^%[%]]*$")
+--
+-- 	-- Find the positions of the opening and closing parentheses
+-- 	local in_parentheses = line:sub(1, col):match("()%([^%(%)]*$")
+--
+-- 	if in_square_brackets then
+-- 		-- Fuzzy search H1 headers and YAML titles
+-- 		local query = line:sub(in_square_brackets + 1, col)
+-- 		items = M.search_headers_or_titles(query)
+-- 	elseif in_parentheses then
+-- 		-- Fuzzy search file names
+-- 		local query = line:sub(in_parentheses + 1, col)
+-- 		items = M.search_file_names(query)
+-- 	end
+--
+-- 	callback({
+-- 		items = vim.tbl_map(function(item)
+-- 			return {
+-- 				label = item.title,
+-- 				documentation = item.path,
+-- 			}
+-- 		end, items),
+-- 	})
+-- end
+
+-- function M.setup_cmp()
+-- 	local existing_sources = cmp.get_config().sources or {}
+-- 	table.insert(existing_sources, 1, { name = "markdown-links" }) -- Insert ytags at the first position
+--
+-- 	cmp.setup.filetype("markdown", {
+-- 		sources = existing_sources,
+-- 	})
+-- end
 function source:complete(_, callback)
 	local items = {}
 
 	-- Logic to detect cursor position and suggest items
 	local line = vim.api.nvim_get_current_line()
-	local col = vim.api.nvim_win_get_cursor(0)[2]
-	-- local in_square_brackets = string.find(line:sub(1, col), "%[.-%]")
-	-- local in_parentheses = string.find(line:sub(1, col), "%(.-%)")
+	local col = vim.api.nvim_win_get_cursor(0)[2] + 1 -- Lua is 1-based indexing
+
 	-- Find the positions of the opening and closing square brackets
 	local in_square_brackets = line:sub(1, col):match("()%[[^%[%]]*$")
 
@@ -132,11 +173,11 @@ function source:complete(_, callback)
 
 	if in_square_brackets then
 		-- Fuzzy search H1 headers and YAML titles
-		local query = line:sub(in_square_brackets + 1, col)
+		local query = line:sub(in_square_brackets + 1, col - 1)
 		items = M.search_headers_or_titles(query)
 	elseif in_parentheses then
 		-- Fuzzy search file names
-		local query = line:sub(in_parentheses + 1, col)
+		local query = line:sub(in_parentheses + 1, col - 1)
 		items = M.search_file_names(query)
 	end
 
@@ -144,6 +185,7 @@ function source:complete(_, callback)
 		items = vim.tbl_map(function(item)
 			return {
 				label = item.title,
+				insertText = "[" .. item.title .. "](" .. item.path .. ")",
 				documentation = item.path,
 			}
 		end, items),
@@ -152,11 +194,58 @@ end
 
 function M.setup_cmp()
 	local existing_sources = cmp.get_config().sources or {}
-	table.insert(existing_sources, 1, { name = "markdown-links" }) -- Insert ytags at the first position
+	table.insert(existing_sources, 1, { name = "markdown-links" }) -- Insert markdown-links at the first position
 
 	cmp.setup.filetype("markdown", {
 		sources = existing_sources,
+		formatting = {
+			fields = { "abbr", "kind", "menu" },
+			expandable_indicator = true,
+			format = function(entry, vim_item)
+				vim_item.menu = ({
+					["markdown-links"] = "[Link]",
+				})[entry.source.name]
+				return vim_item
+			end,
+		},
 	})
+
+	-- Custom handler for confirming the completion
+	cmp.event:on("confirm_done", function(event)
+		local entry = event.entry
+		local item = entry:get_completion_item()
+		if entry.source.name == "markdown-links" then
+			local insert_text = item.insertText or item.label
+			local cursor_pos = vim.api.nvim_win_get_cursor(0)
+			local line = vim.api.nvim_get_current_line()
+			local before_cursor = line:sub(1, cursor_pos[2])
+			local after_cursor = line:sub(cursor_pos[2] + 1)
+
+			local new_line
+			local in_square_brackets = before_cursor:match("()%[[^%[%]]*$")
+			local in_parentheses = before_cursor:match("()%([^%(%)]*$")
+
+			if in_square_brackets then
+				-- Replace content within []
+				local left = before_cursor:sub(1, in_square_brackets)
+				local right = after_cursor:match("()%]")
+				new_line = left .. item.title .. "](" .. item.path .. ")" .. after_cursor:sub(right + 1)
+			elseif in_parentheses then
+				-- Replace content within ()
+				local left = before_cursor:sub(1, in_parentheses)
+				local right = after_cursor:match("()%)")
+				if right then
+					right = right - 1
+				end
+				new_line = before_cursor .. item.path .. after_cursor:sub(right + 1)
+			else
+				new_line = before_cursor .. insert_text .. after_cursor
+			end
+
+			vim.api.nvim_set_current_line(new_line)
+			vim.api.nvim_win_set_cursor(0, { cursor_pos[1], cursor_pos[2] + #item.path })
+		end
+	end)
 end
 
 function M.on_buf_enter()
