@@ -155,11 +155,11 @@ function M.setup_cmp()
 end
 
 function M.on_buf_enter()
-	cmp.setup.buffer({
-		sources = {
-			{ name = "markdown-links" },
-		},
-	})
+	-- cmp.setup.buffer({
+	-- 	sources = {
+	-- 		{ name = "markdown-links" },
+	-- 	},
+	-- })
 end
 
 function M.initialize(config)
