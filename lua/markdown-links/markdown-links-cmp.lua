@@ -28,10 +28,9 @@ end
 local function calculate_score(query, text)
 	local score = 0
 	local query_len = #query
-	local text_len = #text
 
 	-- Exact match bonus
-	if text:find(query) then
+	if text:find(query, 1, true) then
 		score = score + 100
 	end
 
@@ -41,7 +40,7 @@ local function calculate_score(query, text)
 	end
 
 	-- Substring match bonus
-	local match_start, match_end = text:find(query)
+	local match_start, match_end = text:find(query, 1, true)
 	if match_start and match_end then
 		score = score + (100 / (match_end - match_start + 1))
 	end
@@ -49,7 +48,7 @@ local function calculate_score(query, text)
 	-- Character proximity bonus
 	local last_pos = 0
 	for i = 1, query_len do
-		local pos = text:find(query:sub(i, i), last_pos + 1)
+		local pos = text:find(query:sub(i, i), last_pos + 1, true)
 		if pos then
 			score = score + (10 / (pos - last_pos))
 			last_pos = pos
