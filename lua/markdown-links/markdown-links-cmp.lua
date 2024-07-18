@@ -155,11 +155,11 @@ function M.setup_cmp()
 end
 
 function M.on_buf_enter()
-	-- cmp.setup.buffer({
-	-- 	sources = {
-	-- 		{ name = "markdown-links" },
-	-- 	},
-	-- })
+	local existing_sources = cmp.get_config().sources or {}
+	table.insert(existing_sources, 1, { name = "markdown-links" }) -- Insert ytags at the first position
+	cmp.setup.buffer({
+		sources = existing_sources,
+	})
 end
 
 function M.initialize(config)
