@@ -90,6 +90,7 @@ end
 function M.search_headers_or_titles(query)
 	local files = vim.fn.glob("**/*.md", false, true) -- Get all Markdown files
 	local titles = {}
+	vim.notify("Files (hort): " .. #files)
 
 	for _, file in ipairs(files) do
 		local content = read_file(file)
@@ -107,6 +108,7 @@ end
 
 function M.search_file_names(query)
 	local files = vim.fn.glob("**/*.md", false, true) -- Get all Markdown files
+	vim.notify("Files: " .. #files)
 	local matches = fuzzy_search(
 		query,
 		vim.tbl_map(function(file)
