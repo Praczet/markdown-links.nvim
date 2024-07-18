@@ -198,16 +198,16 @@ function M.setup_cmp()
 
 	cmp.setup.filetype("markdown", {
 		sources = existing_sources,
-		formatting = {
-			fields = { "abbr", "kind", "menu" },
-			expandable_indicator = true,
-			format = function(entry, vim_item)
-				vim_item.menu = ({
-					["markdown-links"] = "[Link]",
-				})[entry.source.name]
-				return vim_item
-			end,
-		},
+		-- formatting = {
+		-- 	fields = { "abbr", "kind", "menu" },
+		-- 	expandable_indicator = true,
+		-- 	format = function(entry, vim_item)
+		-- 		vim_item.menu = ({
+		-- 			["markdown-links"] = "[Link]",
+		-- 		})[entry.source.name]
+		-- 		return vim_item
+		-- 	end,
+		-- },
 	})
 
 	-- Custom handler for confirming the completion
