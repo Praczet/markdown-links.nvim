@@ -1,2 +1,8 @@
 # markdown-links.nvim
-LIttle helper for selecting files for markdown notes
+
+Little helper for selecting files for markdown notes
+
+## TODO
+
+- [ ] Correct detecting when cmp should be fed
+- [ ] Add other features
