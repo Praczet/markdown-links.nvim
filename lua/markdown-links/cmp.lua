@@ -1,30 +1,17 @@
 local M = {}
+
+-- WIll be override or filled by user form manin plugin config
+M.config = {
+	filetypes = { "markdown" }, -- allowed filetypes (not supported yet) for now just markdown
+	kind_hl_group = "#ffc777", -- Default color, you can override this when setting up the plugin
+	excluded_files = {}, -- list of files to exclude
+	excluded_folders = {}, -- list of folders to exclude
+	notes_folder = nil, -- default notes folder if not give current buffer folder will be taken
+}
+
 local source = {}
 local cmp = require("cmp")
 local utils = require("markdown-links.utils")
-
-local function read_file(file_path)
-	-- print("read file")
-	local file = io.open(file_path, "r")
-	if not file then
-		return nil
-	end
-	local content = file:read("*all")
-	file:close()
-	return content
-end
-
-local function extract_title(content, file_path)
-	-- print("extract title")
-	local title = content:match("\ntitle:%s*(.-)\n") or content:match("^#%s*(.-)\n") or content:match("\n#%s*(.-)\n")
-	if not title then
-		-- Extract file name without extension
-		local file_name = vim.fn.fnamemodify(file_path, ":t:r")
-		-- Replace hyphens with spaces and capitalize the first word
-		title = file_name:gsub("-", " "):gsub("^%l", string.upper)
-	end
-	return title
-end
 
 -- Helper function to calculate match score
 local function calculate_score(query, text)
@@ -89,16 +76,37 @@ local function fuzzy_search(query, items)
 
 	return sorted_items
 end
+local function normalize_folder_path(folder_path)
+	return folder_path:gsub("/$", "")
+end
 
 function M.search_headers_titles_filenames(query, context)
-	-- print("Searching headers, titles, and filenames for query: " .. vim.inspect(query))
-	local files = vim.fn.glob("**/*.md", false, true) -- Get all Markdown files
+	-- local search_dir = vim.fn.expand("%:p:h")
+	-- if M.config.notes_folder then
+	-- 	search_dir = M.config.notes_folder
+	-- end
+	-- search_dir = search_dir or ""
+	-- local files = vim.fn.globpath(search_dir, "**/*.md", false, true)
+	local files = utils.get_markdown_files(M.config)
 	local results = {}
 
 	for _, file in ipairs(files) do
-		local content = read_file(file)
-		local title = extract_title(content, file)
-		local filepath = vim.fn.fnamemodify(file, ":.")
+		-- if
+		-- 	not is_excluded_folder(file, M.config.excluded_folders)
+		-- 	and not is_excluded_file(file, M.config.excluded_files)
+		-- then
+		local content = utils.read_file(file)
+		local title = utils.extract_title(content, file)
+		local tags = utils.get_yaml_tags(content)
+
+		-- Make path relative to notes_folder if specified
+		local filepath
+		if M.config.notes_folder and #M.config.notes_folder > 0 then
+			local normalized_notes_folder = normalize_folder_path(M.config.notes_folder)
+			filepath = vim.fn.fnamemodify(file, ":p"):gsub("^" .. vim.fn.expand(normalized_notes_folder) .. "/", "")
+		else
+			filepath = vim.fn.fnamemodify(file, ":~:.")
+		end
 
 		if content then
 			local display, insert, documentation
@@ -108,17 +116,24 @@ function M.search_headers_titles_filenames(query, context)
 			else
 				display = "(" .. filepath .. ")[" .. title .. "]"
 			end
-			documentation = "file: **" .. filepath .. "**"
+			documentation = "# Markdown Links\n\nFile: **" .. filepath .. "**"
 			if title then
-				documentation = documentation .. "\ntitle: **" .. title .. "**"
+				documentation = documentation .. "\nTitle: **" .. title .. "**"
 			end
-			insert = file
+			if tags and #tags > 0 then
+				documentation = documentation .. "\n\n\ntags: *" .. table.concat(tags, ", ") .. "*"
+			end
+			insert = filepath
 
-			table.insert(
-				results,
-				{ display = display, insert = insert, documentation = documentation, path = file, title = title }
-			)
+			table.insert(results, {
+				display = display,
+				insert = insert,
+				documentation = documentation,
+				path = filepath,
+				title = title,
+			})
 		end
+		-- end
 	end
 
 	local matches = fuzzy_search(query, results)
@@ -126,7 +141,7 @@ function M.search_headers_titles_filenames(query, context)
 end
 
 function source:complete(_, callback)
-	utils.log_message("markdown-links-cmp.source.complete", "Complete called")
+	utils.log_message("cmp.source.complete", "Complete called")
 	local items = {}
 	local line = vim.api.nvim_get_current_line()
 	local col = vim.api.nvim_win_get_cursor(0)[2] + 1 -- Lua is 1-based indexing
@@ -162,6 +177,7 @@ function source:complete(_, callback)
 		items = M.search_headers_titles_filenames(query or "", "brackets")
 	end
 
+	-- icon = "",
 	callback({
 		items = vim.tbl_map(function(item)
 			return {
@@ -170,59 +186,36 @@ function source:complete(_, callback)
 				documentation = item.documentation, -- This is the detailed info shown in a floating window.
 				path = item.path, -- This is additional information for internal use.
 				title = item.title,
+				cmp = {
+					kind_text = " MD-LNK",
+					kind_hl_group = "CmpItemKindMarkdownLink",
+				},
 			}
 		end, items),
 	})
 end
 function M.setup_cmp()
-	utils.log_message("markdown-links-cmp.M.setup_cmp", "Setting up markdown-links cmp")
+	utils.log_message("cmp.M.setup_cmp", "Setting up markdown-links cmp")
 	local existing_sources = cmp.get_config().sources or {}
-	table.insert(existing_sources, 1, { name = "markdownlinks", group_index = 1, option = {} }) -- Insert markdown-links at the first position
-	vim.cmd([[
-    highlight CmpItemKindMarkdownLink guifg=#569CD6
-  ]])
-	utils.log_message("markdown-links-cmp.M.setup_cmp", "before cmp.setup.filetype")
-	utils.log_message("markdown-links-cmp.M.setup_cmp", vim.inspect(existing_sources))
+	table.insert(existing_sources, 1, { name = "markdown-links", group_index = 1, option = {} }) -- Insert markdown-links at the first position
+
+	local highlight_cmd = string.format("highlight CmpItemKindMarkdownLink guifg=%s", M.config.kind_hl_group)
+	vim.cmd(highlight_cmd)
+
+	utils.log_message("cmp.M.setup_cmp", "before cmp.setup.filetype")
+	utils.log_message("cmp.M.setup_cmp", vim.inspect(existing_sources))
 	cmp.setup.filetype("markdown", {
 		sources = existing_sources,
 		formatting = {
 			fields = { "abbr", "kind", "menu" },
 			expandable_indicator = true,
 			format = function(entry, vim_item)
-				utils.log_message("markdown-links-cmp.M.setup_cmp", "Formatting entry from source: ")
-				-- if entry.source.name == "markdown-links" then
-				-- 	vim_item.kind = "" -- Markdown file icon from Nerd Font
-				-- 	vim_item.kind_hl_group = "CmpItemKindMarkdownLink"
-				-- 	vim_item.menu = "[MD-LNK]"
-				-- 	utils.log_message("markdown-links-cmp.M.setup_cmp", "Set kind and menu for markdown-links")
-				-- else
-				-- 	vim_item.menu = ({
-				-- 		buffer = "[Buffer]",
-				-- 		nvim_lsp = "[LSP]",
-				-- 		luasnip = "[Snippet]",
-				-- 		path = "[Path]",
-				-- 		codeium = "[Codeium]",
-				-- 	})[entry.source.name]
-				-- 	utils.log_message(
-				-- 		"markdown-links-cmp.M.setup_cmp",
-				-- 		"Set menu for other sources" .. entry.source.name
-				-- 	)
-				-- end
-				-- -- vim_item.menu = ({
-				-- -- 	["markdown-links"] = "[Link]",
-				-- -- })[entry.source.name]
-				-- ---- Add a debug print statement
-				-- utils.log_message(
-				-- 	"markdown-links-cmp.M.setup_cmp",
-				-- 	"Source: " .. entry.source.name .. ", Kind: " .. vim_item.kind
-				-- )
-
 				return vim_item
 			end,
 		},
 	})
 
-	utils.log_message("markdown-links-cmp.M.setup_cmp", "before cmp.event:on")
+	utils.log_message("cmp.M.setup_cmp", "before cmp.event:on")
 	cmp.event:on("confirm_done", function(event)
 		local entry = event.entry
 		local item = entry:get_completion_item()
@@ -237,6 +230,7 @@ function M.setup_cmp()
 			local new_line
 			local in_square_brackets_start, in_square_brackets_end = before_cursor:find("%[([^%[%]]*)$")
 			local in_parentheses_start, in_parentheses_end = before_cursor:find("%(([^%(%)]*)$")
+			title = utils.escape_square_brackets(title)
 
 			-- Handle cases based on cursor position and context
 			if in_square_brackets_start then
@@ -306,28 +300,31 @@ function M.setup_cmp()
 end
 
 function M.on_buf_enter()
-	utils.log_message("markdown-links-cmp.M.on_buf_enter", "Enter on buffer")
-	local existing_sources = cmp.get_config().sources or {}
-	table.insert(existing_sources, 1, { name = "markdownlinks" }) -- Insert ytags at the first position
-	cmp.setup.buffer({
-		sources = existing_sources,
-	})
+	local filetype = vim.bo.filetype
+	if filetype == "markdown" then
+		utils.log_message("cmp.M.on_buf_enter", "Enter on buffer")
+		local existing_sources = cmp.get_config().sources or {}
+		table.insert(existing_sources, 1, { name = "markdown-links" }) -- Insert ytags at the first position
+		cmp.setup.buffer({
+			sources = existing_sources,
+		})
+	end
 end
 
 function M.initialize(config)
-	utils.log_message("markdown-links-cmp.M.initialize", "Initializing markdown-links") -- Debug
-	config = config or {}
+	utils.log_message("cmp.M.initialize", "Initializing markdown-links") -- Debug
+	M.config = vim.tbl_deep_extend("force", M.config, config or {})
 
-	config.filetypes = config.filetypes or { "markdown" }
+	M.config.filetypes = M.config.filetypes or { "markdown" }
 	vim.cmd([[
         augroup CmdMarkdownFiles
             autocmd!
-            autocmd FileType ]] .. table.concat(config.filetypes, ",") .. [[ lua require('markdown-links.markdown-links-cmp').on_buf_enter()
+            autocmd FileType ]] .. table.concat(M.config.filetypes, ",") .. [[ lua require('markdown-links.cmp').on_buf_enter()
         augroup END
     ]])
 
 	M.setup_cmp()
-	cmp.register_source("markdownlinks", source)
+	cmp.register_source("markdown-links", source)
 end
 
 return M
