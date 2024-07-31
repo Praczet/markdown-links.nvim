@@ -76,9 +76,6 @@ local function fuzzy_search(query, items)
 
 	return sorted_items
 end
-local function normalize_folder_path(folder_path)
-	return folder_path:gsub("/$", "")
-end
 
 function M.search_headers_titles_filenames(query, context)
 	-- local search_dir = vim.fn.expand("%:p:h")
@@ -102,7 +99,7 @@ function M.search_headers_titles_filenames(query, context)
 		-- Make path relative to notes_folder if specified
 		local filepath
 		if M.config.notes_folder and #M.config.notes_folder > 0 then
-			local normalized_notes_folder = normalize_folder_path(M.config.notes_folder)
+			local normalized_notes_folder = utils.normalize_folder_path(M.config.notes_folder)
 			filepath = vim.fn.fnamemodify(file, ":p"):gsub("^" .. vim.fn.expand(normalized_notes_folder) .. "/", "")
 		else
 			filepath = vim.fn.fnamemodify(file, ":~:.")

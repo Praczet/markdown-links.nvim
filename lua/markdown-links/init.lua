@@ -8,12 +8,14 @@ M.config = {
 	excluded_files = {}, -- List of files to exclude
 	excluded_folders = {}, -- List of folders to exclude
 	notes_folder = nil,
+	debug = true,
 }
 
 M.mdl_cmp = require("markdown-links.cmp")
 M.mdl_telescope = require("markdown-links.telescope")
 
 function M.setup(user_config)
+	utils.debug = M.debug
 	utils.log_message("init.M.setup", "Setting up markdown-links") -- Debug print
 	M.config = vim.tbl_deep_extend("force", M.config, user_config or {})
 	M.initialize()
