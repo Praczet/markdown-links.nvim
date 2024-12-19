@@ -7,6 +7,8 @@ M.config = {
 	excluded_files = {}, -- list of files to exclude
 	excluded_folders = {}, -- list of folders to exclude
 	notes_folder = nil, -- default notes folder if not give current buffer folder will be taken
+	search_engine = "auto", -- options: "telescope", "fzf-lua", "auto"
+	autocomplete_engine = "cmp", -- options: "cmp", "blink", "auto"
 }
 
 local source = {}
@@ -301,7 +303,7 @@ function M.on_buf_enter()
 	if filetype == "markdown" then
 		utils.log_message("cmp.M.on_buf_enter", "Enter on buffer")
 		local existing_sources = cmp.get_config().sources or {}
-		table.insert(existing_sources, 1, { name = "markdown-links" }) -- Insert ytags at the first position
+		table.insert(existing_sources, 1, { name = "markdown-links" })
 		cmp.setup.buffer({
 			sources = existing_sources,
 		})

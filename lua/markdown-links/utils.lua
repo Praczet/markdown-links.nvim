@@ -135,4 +135,11 @@ function M.escape_square_brackets(str)
 	return str:gsub("%[", "\\["):gsub("%]", "\\]")
 end
 
+-- Check if a plugin is installed
+-- @param name Plugin name
+function M.is_plugin_installed(name)
+	local ok, _ = pcall(require, name)
+	return ok
+end
+
 return M
